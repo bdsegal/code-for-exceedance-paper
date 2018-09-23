@@ -1,4 +1,4 @@
-## Code for reproducing examples and simulations in "Exceedance probability for parameters estimates" by Segal, B. D. (submitted).
+## Code for reproducing examples and simulations in "Towards replicability with confidence intervals for the exceedance probability" by Segal, B. D. (submitted).
 
 ### Contents
 
