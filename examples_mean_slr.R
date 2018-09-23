@@ -2,7 +2,8 @@ library(ggplot2)
 library(BayesFactor)
 library(dplyr)
 source("functions.R")
-paper.path <- "/home/bsegal/Dropbox/Research/exceedance/exceedance_prob/paper"
+paper.path <- "/home/bsegal/Dropbox/Research/exceedance/exceedance_prob/paper/segal_exceedance_TAS"
+present.path <- "/home/bsegal/Dropbox/Research/exceedance/exceedance_prob/presentation"
 
 alpha <- 0.05
 
@@ -26,6 +27,7 @@ cutoff.vec <- seq(from = theta.hat - 1*sd, to = theta.hat + 1*sd, by = 0.01)
 
 exceed.point.list <- list()
 exceed.ci.list <- list()
+lower.zero <- data.frame(m = m.vec, lower = NA)
 
 for (j in 1:length(m.vec)) {
 
@@ -48,13 +50,22 @@ for (j in 1:length(m.vec)) {
 
   # point estimates for exceedance prob
   exceed.point.list[[j]] <- data.frame(c = cutoff.vec, 
-                                    val = point.est, 
-                                    m = paste0("m = ", prettyNum(m, big.mark = ",")))
+                                       val = point.est, 
+                                       m = paste0("m = ", prettyNum(m, big.mark = ",")))
 
   # confidence intervals for exceedance prob
   exceed.ci.list[[j]] <- data.frame(c = c(cutoff.vec, rev(cutoff.vec)), 
                                     val = c(upper, rev(lower)),
                                     m = paste0("m = ", prettyNum(m, big.mark = ",")))
+
+  delta.ci.zero <- getDeltaCI(cutoff = 0, 
+                         theta.hat = theta.hat, 
+                         sd.hat = sd.hat, 
+                         n = n, 
+                         d = d,
+                         alpha = alpha)
+
+  lower.zero$lower[j] <- pnorm(sqrt(m/n) * delta.ci.zero["upper", ], lower.tail = FALSE)
 }
 
 exceed.point <- do.call(rbind, exceed.point.list)
@@ -63,27 +74,75 @@ exceed.ci <- do.call(rbind, exceed.ci.list)
 dev.new(width = 5, height = 4)
 ggplot(aes(x = x), data = data.frame(x = x)) +
   geom_histogram(binwidth = 0.5, boundary = 0, fill = "grey", color = "black") +
-  theme_bw(14) +
-  labs(y = "Count") +
+  theme_bw(17) +
+  labs(y = "Count", x = "y") +
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
   geom_vline(xintercept = 0, linetype = "dashed")
 ggsave(file.path(paper.path, "sample_mean_100.png"))
+
+dev.new(width = 5, height = 4)
+ggplot(aes(x = x), data = data.frame(x = x)) +
+  geom_histogram(binwidth = 0.5, boundary = 0, fill = "grey", color = "black") +
+  theme_bw(16) +
+  labs(y = "Count", x = "y",
+       title = bquote(paste(bar(y), " = ", .(signif(theta.hat, 2)), ", ",
+                            "sd = ", .(signif(sd.hat, 2)), ", ",
+                            "n = ", .(n), sep = "")))+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_vline(xintercept = 0, linetype = "dashed")
+ggsave(file.path(present.path, "sample_mean_100.png"))
 
 dev.new(width = 9, height = 3.5)
 ggplot() +
   geom_polygon(aes(x = c, y = val), data = exceed.ci, 
                fill = "grey", color = "grey", linetype = "solid") +
   geom_line(aes(x = c, y = val), data = exceed.point) + 
-  theme_bw(14) +
+  theme_bw(17) +
   facet_wrap(~ m) +
   labs(x = "Cutoff c", 
-       y = expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", tilde(theta)^m, ">c)", sep = ""))) +
+       y = expression(paste("Pr", ""[hat(theta)], ","[hat(sigma)], "(", 
+                            hat(theta)^"rep", ">c)", sep = ""))) +
   theme(plot.title = element_text(hjust = 0.5),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  geom_vline(xintercept = 0, linetype = "dashed", size = 0.25)
+  geom_vline(xintercept = 0, linetype = "dashed")
 ggsave(file.path(paper.path, "S_100.png"))
+
+signif(lower.zero, 2)
+#     m lower
+# 1  50  0.56
+# 2 100  0.58
+# 3 150  0.60
+
+exceed.ci.present <- exceed.ci
+exceed.ci.present$m <- gsub("m", "Future sample size", exceed.ci.present$m)
+exceed.ci.present$m <- factor(exceed.ci.present$m,
+                              levels = paste0("Future sample size = ", c(50, 100, 150)))
+
+exceed.point.present <- exceed.point
+exceed.point.present$m <- gsub("m", "Future sample size", exceed.point.present$m)
+exceed.point.present$m <- factor(exceed.point.present$m,
+                              levels = paste0("Future sample size = ", c(50, 100, 150)))
+
+dev.new(width = 9, height = 3.5)
+ggplot() +
+  geom_polygon(aes(x = c, y = val), data = exceed.ci.present, 
+               fill = "grey", color = "grey", linetype = "solid") +
+  geom_line(aes(x = c, y = val), data = exceed.point.present) + 
+  theme_bw(18) +
+  facet_wrap(~ m) +
+  labs(x = "Cutoff c", 
+       y = expression(paste("Pr", ""[hat(theta)], ","[hat(sigma)], "(", 
+                            hat(theta)^"new", ">c)", sep = ""))) +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  geom_vline(xintercept = 0, linetype = "dashed")
+ggsave(file.path(present.path, "S_100.png"))
+
 
 # t-tests and Bayes factors
 
@@ -117,6 +176,10 @@ bf
 theta.hat + c(-1, 1) * qt(p = 1 - alpha/2, df = n - d) * sd.hat / sqrt(n)
 # [1] 0.02401042 0.46638398
 
+t.test(x)
+
+bf.zero <- ttestBF(x, mu = 0)
+1 / exp(bf.zero@bayesFactor$bf)
 
 # linear regression -----------------------------------------------------------
 set.seed(12345)
@@ -133,7 +196,7 @@ y <- rnorm(n = n, mean = beta[1] + x * beta[2], sd = nu)
 
 dev.new(width = 5, height = 4)
 qplot(x = x, y = y) +
-  theme_bw(14) +
+  theme_bw(17) +
   geom_abline(intercept = beta[1], slope = beta[2], linetype = "dashed")+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
@@ -188,14 +251,14 @@ dev.new(width = 9, height = 3.5)
 ggplot(aes(x = c, y = val), data = exceed.point) +
   geom_polygon(data = exceed.ci, fill = "grey", color = "grey", linetype = "solid") +
   geom_line() + 
-  theme_bw(14) +
+  theme_bw(17) +
   facet_wrap(~ m) +
   labs(x = "Cutoff c", 
        y = expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", tilde(theta)^m, ">c)", sep = ""))) +
   theme(plot.title = element_text(hjust = 0.5),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  geom_vline(xintercept = 1.5, linetype = "dashed", size = 0.25)
+  geom_vline(xintercept = 1.5, linetype = "dashed")
 ggsave(file.path(paper.path, "S_lin_reg_100.png"))
 
 # t-tests and confidence intervals
