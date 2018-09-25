@@ -2,8 +2,8 @@ library(ggplot2)
 library(dplyr)
 library(reshape2)
 source("functions.R")
-paper.path <- "/home/bsegal/Dropbox/Research/exceedance/exceedance_prob/paper/segal_exceedance_TAS"
-present.path <- "/home/bsegal/Dropbox/Research/exceedance/exceedance_prob/presentation"
+paper.path <- "../paper"
+present.path <- "../exceedance_prob/presentation"
 
 # sample mean -----------------------------------------------------------------
 set.seed(123)
@@ -151,19 +151,8 @@ lower <- pnorm(sqrt(m/n) * delta.ci["upper", ], lower.tail = FALSE)
 upper <- pnorm(sqrt(m/n) * delta.ci["lower", ], lower.tail = FALSE)
 
 p.two.sided <- 2 * (1 - pt(sqrt(n) * abs(theta.hat - cutoff.vec) / sd.hat, df = n - 1))
-# p.one.sided <- pt(sqrt(n) * (theta.hat - cutoff.vec) / sd.hat, df = n - 1, lower.tail = FALSE)
 
-# Note: (1 - lower bound of exceedance prob) > p.val everywhere except
-# in neighborhood of theta.hat
 exceed.p <- data.frame(cutoff.vec, pr.lt = 1-lower, p.two.sided)
-
-exceed.p %>%
-  mutate(exceed.gt.p = pr.lt > p.two.sided)
-
-# with(exceed.p, plot(cutoff.vec, pr.lt - p.two.sided, type = "l"))
-# abline(v = ci)
-
-exceed.p.m <- melt(exceed.p, id = "cutoff.vec")
 
 exceed.ci <- data.frame(c = c(cutoff.vec, rev(cutoff.vec)), 
                         val = c(upper, rev(lower)))
@@ -193,117 +182,8 @@ ggplot() +
                                expression(theta[L]),
                                expression(theta[U]),
                                1)) +
-  scale_color_manual("", values = c("grey", "red"),
+  scale_color_manual("", values = c("grey", "black"),
                      labels = c(expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", hat(theta)^"rep" <="c)", sep = "")),
                                 "p-value")) +
   guides(color = guide_legend(override.aes = list(size = c(5, 0.6))))
 ggsave(file.path(paper.path, "ci_p_val_overlay.png"))
-
-
-# SCRATCH ---------------------------------------------------------------------
-# ci.dist <- data.frame(cutoff.vec, p.two.sided)
-ggplot(aes(x = cutoff.vec, y = value, color = variable, linetype = variable), 
-       data = exceed.p.m) +
-  geom_line() +
-  theme_bw(14) +
-  theme(plot.title = element_text(hjust = 0.5),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()) +
-  labs(x = "Cutoff c", y = "") +
-  scale_linetype_manual("", values = c(1, 2),
-                        labels = c(expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", tilde(theta)^m<="c)", sep = "")),
-                                   "2-sided p-val")) +
-  scale_color_manual("", values = c("black", "red"),
-                     labels = c(expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", tilde(theta)^m<="c)", sep = "")),
-                      "2-sided p-val")) +
-  geom_vline(xintercept =c(ci), linetype = "dashed") +
-  geom_hline(yintercept = c(0.05, 0.5), linetype = "dashed") +
-  scale_y_continuous(breaks = c(0, 0.05, 0.25, 0.5, 0.75, 1))
-
-
-# base R graphic
-plot(cutoff.vec, 1 - lower, type = "l")
-# lines(cutoff.vec, p.one.sided, col = "blue")
-# lines(cutoff.vec, 1 - t.high)
-lines(cutoff.vec, p.two.sided, col = "red", lty = 2)
-# abline(v = 0, lty = 2)
-# abline(h = 0.58, lty = 2)
-# abline(h = c(0.5, 0.05), lty = 3)
-# abline(v = ci, lty = 3)
-# legend("topright",
-#        legend = c("two-sided", "one-sided"),
-#        col = c("red", "blue"),
-#        lty = 1,
-#        inset = 0.05)
-
-
-# standard confidence interval
-stand.ci <- data.frame(lower = theta.hat - t.alpha * sd.hat / sqrt(n),
-                       upper = theta.hat + t.alpha * sd.hat / sqrt(n),
-                       point = theta.hat,
-                       val = 0.5)
-
-
-exceed.ci.100 <- exceed.ci[grep(100, exceed.ci$m), ]
-exceed.point.100 <- exceed.point[grep(100, exceed.point$m), ]
-
-exceed.p.val <- data.frame(cutoff.vec,
-                           exceed = 1 - exceed.point.100$val,
-                           p.two.sided = p.two.sided)
-exceed.p.val.m <- melt(exceed.p.val, id = "cutoff.vec")
-
-ggplot() +
-  geom_polygon(aes(x = c, y = 1 - val), data = exceed.ci.100, 
-               fill = "grey", color = "grey", linetype = "solid") +
-  # geom_line(aes(x = cutoff.vec, y = value, color = variable, linetype = variable),
-  #           data = exceed.p.val.m) +
-  geom_line(aes(x = cutoff.vec, y = p.two.sided),
-            linetype = "solid", color = "red", data = ci.dist) +
-  # geom_errorbarh(aes(xmin = lower, xmax = upper, y = val), data = stand.ci,
-  #                height = 0.1, linetype = "solid") +
-  # geom_point(aes(x = point, y = val), data = stand.ci) +
-  # geom_line(aes(x = c, y = 1 - val), data = plot.data) + 
-  theme_bw(14) +
-  # facet_wrap(~ m) +
-  labs(x = "Cutoff c", 
-       y = "") +
-  theme(plot.title = element_text(hjust = 0.5),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()) +
-  # geom_segment(aes(x = lower, xend = upper, y = val, yend = val), data = stand.ci,
-  #                height = 0.1, linetype = "solid") +
-  geom_vline(xintercept =c(ci), linetype = "dotted") +
-  geom_hline(yintercept = c(0.05, 0.5), linetype = "dotted") +
-  scale_y_continuous(breaks = c(0, 0.05, 0.25, 0.5, 0.75, 1)) +
-  scale_linetype_manual("", values = c(1, 2),
-                        labels = c(expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", tilde(theta)^m<="c)", sep = "")),
-                                   "2-sided p-val")) +
-  scale_color_manual("", values = c("black", "red"),
-                     labels = c(expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", tilde(theta)^m<="c)", sep = "")),
-                      "2-sided p-val"))
-
-# with(exceed.point.100, plot(x = c, y = 1 - val, type = "n",
-#                             xlab = "Cutoff c",
-#                             ylab = "",
-#                             ))
-# with(exceed.ci.100, polygon(x = c, y = 1 - val, col = "grey", border = NA))
-# lines(cutoff.vec, p.two.sided, col = "red", lty = 2)
-
-# ggplot() +
-#   geom_polygon(aes(x = c, y = val), data = exceed.ci.100, 
-#                fill = "grey", color = "grey", linetype = "solid") +
-#   # geom_line(aes(x = c, y = 1 - val), data = plot.data) + 
-#   theme_bw(14) +
-#   # facet_wrap(~ m) +
-#   labs(x = "Cutoff c", 
-#        y = expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", tilde(theta)^m<="c)", sep = ""))) +
-#   theme(plot.title = element_text(hjust = 0.5),
-#         panel.grid.major = element_blank(),
-#         panel.grid.minor = element_blank()) +
-#   # geom_segment(aes(x = lower, xend = upper, y = val, yend = val), data = stand.ci,
-#   #                height = 0.1, linetype = "solid") +
-#   geom_vline(xintercept =c(ci), linetype = "dotted") +
-#   geom_hline(yintercept = c(0.5, 0.05), linetype = "dotted") +
-#   geom_line(aes(x = cutoff.vec, y = p.two.sided),
-#             linetype = "solid", color = "red", data = ci.dist) +
-#   scale_y_continuous(breaks = c(0, 0.05, 0.25, 0.5, 0.75, 1))

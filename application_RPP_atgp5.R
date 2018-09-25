@@ -36,8 +36,8 @@ library(ggplot2)
 library(BayesFactor)
 # library(dplyr)
 source("functions.R")
-paper.path <- "/home/bsegal/Dropbox/Research/exceedance/exceedance_prob/paper/segal_exceedance_TAS"
-present.path <- "/home/bsegal/Dropbox/Research/exceedance/exceedance_prob/presentation"
+paper.path <- "../paper"
+present.path <- "../presentation"
 
 alpha <- 0.05
 
