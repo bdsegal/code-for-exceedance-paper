@@ -21,29 +21,18 @@ source("http://sachaepskamp.com/files/OSF/getOSFfile.R") # the getOSFfile functi
 #Download dat data file as no need for file conversion for reading into R
 file <- getOSFfile("https://osf.io/btr65/")
 berry.data <- read.table(file, sep="\t", header=TRUE) 
-# save(berry.data, file = "berry_data.Rdata")
-# load("berry_data.Rdata")
 
-##@@ DATA MANIPULATION @@##
-#@ NOTE: Include here ALL difference between OSF data and data used in analysis
-#@ TIP: You will want to learn all about dplyr for manipulating data.
-
-##@@ DATA ANLAYSIS @@##
-#@ NOTE: Include a print or sumarry call on the resulting object
-
-# exceedance probability ------------------------------------------------------
+# Newly added code ------------------------------------------------------------
 library(ggplot2)
+library(exceedProb)
 library(BayesFactor)
-# library(dplyr)
-source("functions.R")
 paper.path <- "../paper"
-present.path <- "../presentation"
 
 alpha <- 0.05
 
 x <- with(berry.data, meanRT_cr - meanRT_miss)
 n <- length(x)
-m.vec <- c(25, 32, 50)
+m.vec <- n
 d <- 1
 
 dev.new(width = 5, height = 4)
@@ -56,86 +45,48 @@ ggplot(aes(x = x), data = data.frame(x = x)) +
   geom_vline(xintercept = 0, linetype = "dashed")
 ggsave(file.path(paper.path, "application_data_hist.png"))
 
-# qq-plots
-qqnorm(x)
-qqline(x)
-
-theta.hat <- mean(x)
-sd.hat <- sd(x)
+# exceedance probability ----------------------------------
+theta_hat <- mean(x)
+sd_hat <- sd(x)
 
 alpha <- 0.05
-t.alpha <- qt(p = 1 - alpha / 2, df = n - d, lower.tail = TRUE)
+t_alpha <- qt(p = 1 - alpha / 2, df = n - d, lower.tail = TRUE)
 
-cutoff.vec <- seq(from = theta.hat - sd.hat, to = theta.hat + sd.hat, by = 10)
+cutoff <- seq(from = theta_hat - sd_hat, to = theta_hat + sd_hat, by = 1)
 
-exceed.point.list <- list()
-exceed.ci.list <- list()
-lower.zero <- data.frame(m = m.vec, lower = NA)
+ep <- exceedProb(cutoff = cutoff, 
+      theta_hat = theta_hat, 
+      sd_hat = sd_hat, 
+      d = d,
+      alpha = alpha, 
+      n = n,
+      m = n)
 
-for (j in 1:length(m.vec)) {
- m <- m.vec[j]
+exceed_ci <- with(ep, data.frame(cutoff = c(cutoff, rev(cutoff)), 
+                        val = c(upper, rev(lower))))
 
-  point.est <- exceedProb(cutoff.vec, theta.hat = theta.hat, sd.hat = sd.hat, m = m)
+ep0 <- exceedProb(cutoff = 0, 
+      theta_hat = theta_hat, 
+      sd_hat = sd_hat, 
+      d = d,
+      alpha = alpha, 
+      n = n,
+      m = n)
 
-  delta.ci <- getDeltaCI(cutoff = cutoff.vec, 
-                         theta.hat = theta.hat, 
-                         sd.hat = sd.hat, 
-                         n = n, 
-                         d = d,
-                         alpha = alpha)
+signif(ep0, 3)
+#   cutoff point lower upper
+# 1      0 0.992  0.63     1
 
-  lower <- pnorm(sqrt(m/n) * delta.ci["upper", ], lower.tail = FALSE)
-  upper <- pnorm(sqrt(m/n) * delta.ci["lower", ], lower.tail = FALSE)
-
-  # point estimates for exceedance prob
-  exceed.point.list[[j]] <- data.frame(c = cutoff.vec, 
-                                    val = point.est, 
-                                    m = paste0("m = ", prettyNum(m, big.mark = ",")))
-
-  # confidence intervals for exceedance prob
-  exceed.ci.list[[j]] <- data.frame(c = c(cutoff.vec, rev(cutoff.vec)), 
-                                    val = c(upper, rev(lower)),
-                                    m = paste0("m = ", prettyNum(m, big.mark = ",")))
-
-  delta.ci.zero <- getDeltaCI(cutoff = 0, 
-                         theta.hat = theta.hat, 
-                         sd.hat = sd.hat, 
-                         n = n, 
-                         d = d,
-                         alpha = alpha)
-
-  lower.zero$lower[j] <- pnorm(sqrt(m/n) * delta.ci.zero["upper", ], lower.tail = FALSE)
-
-}
-
-exceed.point <- do.call(rbind, exceed.point.list)
-exceed.ci <- do.call(rbind, exceed.ci.list)
-
-# standard confidence interval
-stand.ci <- data.frame(lower = theta.hat - t.alpha * sd.hat / sqrt(n),
-                       upper = theta.hat + t.alpha * sd.hat / sqrt(n),
-                       point = theta.hat,
-                       val = 0.5)
-
-ci <- theta.hat + c(-1, 1) * t.alpha * sd.hat / sqrt(n)
-signif(ci, 3)
-
-signif(lower.zero, 2)
-#    m lower
-# 1 25  0.62
-# 2 32  0.63
-# 3 50  0.66
-
-dev.new(width = 9, height = 3.5)
+dev.new(width = 5.4, height = 3.5)
 ggplot() +
-  geom_polygon(aes(x = c, y = val), data = exceed.ci, 
+  geom_polygon(aes(x = cutoff, y = val), data = exceed_ci, 
                fill = "grey", color = "grey", linetype = "solid") +
-  geom_line(aes(x = c, y = val), data = exceed.point) + 
+  geom_line(aes(x = cutoff, y = point), data = ep) + 
   geom_vline(xintercept = 0, linetype = "dashed") +
   theme_bw(17) +
-  facet_wrap(~ m) +
-  labs(x = "Within-volunteer difference in RT (cutoff c in ms)", 
-       y = expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", hat(theta)^"rep", ">c)", sep = ""))) +
+  # facet_wrap(~ m) +
+  labs(x = "Within-volunteer difference in RT (c in ms)", 
+       y = expression(paste("Pr",""[hat(theta)],","[hat(sigma)],"(", hat(theta)^"rep", "> c)", sep = ""))) +
   theme(plot.title = element_text(hjust = 0.5),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
@@ -173,8 +124,8 @@ t.test(x, alternative = "greater")
 #  57.88808 
 
 # Bayes factor
-bf.int <- ttestBF(x, nullInterval = c(-Inf, 0))
-bf <- bf.int[1] / bf.int[2]
+bf_int <- ttestBF(x, nullInterval = c(-Inf, 0))
+bf <- bf_int[1] / bf_int[2]
 bf
 # Bayes factor analysis
 # --------------
@@ -188,6 +139,6 @@ bf
 1/exp(bf@bayesFactor$bf)
 # [1] 70.91471
 
-bf.zero <- ttestBF(x, mu = 0)
-1 / exp(bf.zero@bayesFactor$bf)
+bf_zero <- ttestBF(x, mu = 0)
+1 / exp(bf_zero@bayesFactor$bf)
 # [1] 0.4512185
