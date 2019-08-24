@@ -23,17 +23,17 @@ t.alpha <- qt(p = 1 - alpha / 2, df = n - d, lower.tail = TRUE)
 
 ci <- theta_hat + c(-1, 1) * t.alpha * sd_hat / sqrt(n)
 
-cutoff_vec <- seq(from = theta_hat - 1*sd_true, to = theta_hat + 1*sd_true, by = 0.01)
+cutoff <- seq(from = theta_hat - 1*sd_true, to = theta_hat + 1*sd_true, by = 0.01)
 
 exceed_point_list <- list()
 exceed_ci_list <- list()
-ci_thetaL <- data.frame(m = m_vec, cutoff = NA, point = NA, lower = NA, upper = NA)
+ci_thetaL_list <- list()
 
 for (j in 1:length(m_vec)) {
 
   m <- m_vec[j]
 
-  ep <- exceedProb(cutoff = cutoff_vec, 
+  ep <- exceedProb(cutoff = cutoff, 
                    theta_hat = theta_hat, 
                    sd_hat = sd_hat, 
                    alpha = alpha, 
@@ -47,11 +47,11 @@ for (j in 1:length(m_vec)) {
                                        m = paste0("m = ", prettyNum(m, big.mark = ",")))
 
   # confidence intervals for exceedance prob
-  exceed_ci_list[[j]] <- data.frame(c = c(cutoff_vec, rev(cutoff_vec)), 
+  exceed_ci_list[[j]] <- data.frame(c = c(cutoff, rev(cutoff)), 
                                     val = c(ep$upper, rev(ep$lower)),
                                     m = paste0("m = ", prettyNum(m, big.mark = ",")))
 
-  ci_thetaL[j, ] <- exceedProb(cutoff = theta_hat - t.alpha * sd_hat / sqrt(n),
+  ci_thetaL_list[[j]] <- exceedProb(cutoff = theta_hat - t.alpha * sd_hat / sqrt(n),
                                theta_hat = theta_hat, 
                                sd_hat = sd_hat, 
                                alpha = alpha, 
@@ -60,7 +60,7 @@ for (j in 1:length(m_vec)) {
                                m = m)
 }
 
-ci_thetaL
+cbind(m = m_vec, do.call(rbind, ci_thetaL_list))
 
 exceed_point <- do.call(rbind, exceed_point_list)
 exceed_ci <- do.call(rbind, exceed_ci_list)
@@ -89,7 +89,7 @@ ggplot() +
         panel.grid.minor = element_blank()) +
   scale_x_continuous(breaks = c(-1, ci, 1),
                      labels = c(-1, expression(hat(theta)[L]), expression(hat(theta)[U]), 1))
-ggsave(file.path(paper_path, "S_big_m.png"))
+ggsave(file.path(paper_path, "ep_corollaries.png"))
 
 # comparison to p-value -------------------------------------------------------
 
@@ -97,7 +97,7 @@ ggsave(file.path(paper_path, "S_big_m.png"))
 m <- 100
 n <- 100
 
-ep <- exceedProb(cutoff = cutoff_vec, 
+ep <- exceedProb(cutoff = cutoff, 
                    theta_hat = theta_hat, 
                    sd_hat = sd_hat, 
                    alpha = alpha, 
@@ -106,22 +106,22 @@ ep <- exceedProb(cutoff = cutoff_vec,
                    m = m,
                    lower_tail = TRUE)
 
-p_two_sided <- 2 * (1 - pt(sqrt(n) * abs(theta_hat - cutoff_vec) / sd_hat, df = n - 1))
+p_two_sided <- 2 * (1 - pt(sqrt(n) * abs(theta_hat - cutoff) / sd_hat, df = n - 1))
 
-exceed_ci <- data.frame(c = c(cutoff_vec, rev(cutoff_vec)), 
+exceed_ci <- data.frame(c = c(cutoff, rev(cutoff)), 
                         val = c(ep$upper, rev(ep$lower)))
 
-exceed_p_val <- data.frame(cutoff_vec,
+exceed_p_val <- data.frame(cutoff,
                            exceed = ep$point,
                            p_two_sided = p_two_sided)
 
-exceed_p_val_m <- melt(exceed_p_val, id = "cutoff_vec")
+exceed_p_val_m <- melt(exceed_p_val, id = "cutoff")
 
 dev.new(width = 7, height = 4.5)
 ggplot() +
   geom_polygon(aes(x = c, y = val), data = exceed_ci, 
                fill = "grey", color = "grey", linetype = "solid") +
-  geom_line(aes(x = cutoff_vec, y = value, color = variable),
+  geom_line(aes(x = cutoff, y = value, color = variable),
             data = exceed_p_val_m) +
   theme_bw(17) +
   labs(x = "Cutoff c", 
@@ -147,7 +147,7 @@ n <- 100
 t_alpha_one_sided <- qt(p = 1 - alpha, df = n - d, lower.tail = TRUE)
 ci_one_sided <- theta_hat - t_alpha_one_sided * sd_hat / sqrt(n)
 
-ep <- exceedProb(cutoff = cutoff_vec, 
+ep <- exceedProb(cutoff = cutoff, 
                    theta_hat = theta_hat, 
                    sd_hat = sd_hat, 
                    alpha = 2*alpha, 
@@ -156,21 +156,21 @@ ep <- exceedProb(cutoff = cutoff_vec,
                    m = m,
                    lower_tail = TRUE)
 
-p_one_sided <- pt(sqrt(n) * (cutoff_vec - theta_hat) / sd_hat, df = n - 1)
+p_one_sided <- pt(sqrt(n) * (cutoff - theta_hat) / sd_hat, df = n - 1)
 
-exceed_ci <- data.frame(c = c(cutoff_vec, rev(cutoff_vec)), 
+exceed_ci <- data.frame(c = c(cutoff, rev(cutoff)), 
                         val = c(ep$upper, rev(ep$lower)))
 
-exceed_p_val <- data.frame(cutoff_vec,
+exceed_p_val <- data.frame(cutoff,
                            exceed = ep$point,
                            p_one_sided = p_one_sided)
-exceed_p_val_m <- melt(exceed_p_val, id = "cutoff_vec")
+exceed_p_val_m <- melt(exceed_p_val, id = "cutoff")
 
 dev.new(width = 7, height = 4.5)
 ggplot() +
   geom_polygon(aes(x = c, y = val), data = exceed_ci, 
                fill = "grey", color = "grey", linetype = "solid") +
-  geom_line(aes(x = cutoff_vec, y = value, color = variable),
+  geom_line(aes(x = cutoff, y = value, color = variable),
             data = exceed_p_val_m) +
   theme_bw(17) +
   labs(x = "Cutoff c", 

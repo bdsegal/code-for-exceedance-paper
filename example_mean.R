@@ -67,7 +67,7 @@ ggplot() +
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
   geom_vline(xintercept = 0, linetype = "dashed")
-ggsave(file.path(paper.path, "S_100.png"))
+ggsave(file.path(paper.path, "ep_mean_100.png"))
 
 signif(ep0, 2)
 #   cutoff point lower upper
